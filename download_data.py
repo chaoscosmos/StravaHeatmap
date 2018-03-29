@@ -19,10 +19,9 @@ types = ['time', 'latlng', 'distance', 'altitude', 'velocity_smooth', 'heartrate
 
 save_file = 'all_act'
 
-
 def get_api_values():
     secret_id = pd.read_csv("api.key")
-    return secret_id['secret'][0], secret_id['ID'][0]
+    return secret_id['token'][0], secret_id['ID'][0]
 
 
 def split_lat(series):
@@ -36,8 +35,6 @@ def split_long(series):
 
 # This is a hack to get the total number of activities
 # because I can't find another way.
-
-
 def total_num(client):
     activities = client.get_activities()
     for i in range(600):
@@ -48,19 +45,23 @@ def total_num(client):
     return i
 
 
-def get_strava_api(secret, ID):
+def get_strava_api(token, ID):
     all_act = []
-    client = Client(access_token=secret)
+    client = Client(access_token=token)
     tot = total_num(client)
 
-    me = client.get_athlete(ID)
+    me = client.get_athlete()
     activities = client.get_activities()
 
     for i in trange(tot):
         df = pd.DataFrame()
+        print(f'[{i}] df is {df}')
         _a = activities.next()
 
         _streams = client.get_activity_streams(_a.id, types=types)
+        if 'latlng' not in _streams.keys():
+            continue
+
         for item in types:
             if item in _streams.keys():
                 df[item] = pd.Series(_streams[item].data, index=None)
@@ -68,9 +69,10 @@ def get_strava_api(secret, ID):
             df['act_name'] = _a.name
             df['act_type'] = _a.type
 
-        df['lat'] = map(split_lat, (df['latlng']))
-        df['lon'] = map(split_long, (df['latlng']))
+        df['lat'] = list(map(split_lat, (df['latlng'])))
+        df['lon'] = list(map(split_long, (df['latlng'])))
         df['time'] = df['distance'] / (df['velocity_smooth'])
+
         df.fillna(0)
         all_act.append(df)
         del df
@@ -133,3 +135,4 @@ if __name__ == '__main__':
     except:
         print("Error in getting data")
         sys.exit()
+        
